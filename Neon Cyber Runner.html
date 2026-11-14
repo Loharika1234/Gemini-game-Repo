@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Cyber Runner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: #05050a;
+            color: #00f0ff;
+            overflow: hidden;
+            touch-action: none;
+        }
+        .glow-text {
+            text-shadow: 0 0 10px #00f0ff, 0 0 20px #00f0ff, 0 0 30px #00f0ff;
+        }
+        .glow-pink {
+            text-shadow: 0 0 10px #ff007f, 0 0 20px #ff007f;
+        }
+        .glow-box {
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.4), inset 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+        .glow-box-pink {
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.4), inset 0 0 15px rgba(255, 0, 127, 0.2);
+        }
+        .cyber-button {
+            background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%);
+            transition: all 0.2s ease;
+        }
+        .cyber-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px #00f0ff;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col items-center justify-center select-none relative">
+
+    <!-- Background Grid Lines Overlay -->
+    <div class="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(to_right,#00f0ff_1px,transparent_1px),linear-gradient(to_bottom,#00f0ff_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+
+    <!-- Main Game Container -->
+    <div id="game-container" class="relative w-full max-w-[480px] h-[80vh] max-h-[720px] bg-[#080812] border-2 border-[#00f0ff]/40 rounded-2xl overflow-hidden flex flex-col shadow-2xl glow-box">
+        
+        <!-- HUD Overlay -->
+        <div id="hud" class="absolute top-0 left-0 w-full p-4 flex justify-between items-center z-20 pointer-events-none bg-gradient-to-b from-[#080812] to-transparent">
+            <div class="flex flex-col">
+                <span class="text-xs text-gray-400 tracking-widest">SCORE</span>
+                <span id="score-display" class="text-2xl font-black glow-text">000000</span>
+            </div>
+            <div class="flex flex-col items-end">
+                <span class="text-xs text-gray-400 tracking-widest">HI-SCORE</span>
+                <span id="highscore-display" class="text-xl font-bold text-[#ff007f] glow-pink">000000</span>
+            </div>
+        </div>
+
+        <!-- Canvas -->
+        <canvas id="gameCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+
+        <!-- Start Screen Overlay -->
+        <div id="start-screen" class="absolute inset-0 bg-[#080812]/90 backdrop-blur-md flex flex-col items-center justify-center z-30 p-6 text-center">
+            <h1 class="text-4xl md:text-5xl font-black tracking-wider glow-text mb-2">CYBER RUNNER</h1>
+            <p class="text-xs text-gray-400 mb-6 tracking-widest">NEON DODGE PROTOCOL v1.0</p>
+            
+            <div class="bg-gray-900/60 border border-[#00f0ff]/30 p-4 rounded-xl mb-6 max-w-xs text-left text-xs text-gray-300 space-y-2">
+                <p class="font-bold text-[#00f0ff] mb-1">CONTROLS:</p>
+                <p>⚡ Arrow Keys / WASD or Touch/Drag to steer</p>
+                <p>⚡ Avoid glowing red data corruption blocks</p>
+                <p>⚡ Collect cyan energy cores for bonus points</p>
+            </div>
+
+            <button id="start-btn" class="cyber-button text-black font-black px-8 py-4 rounded-xl text-lg tracking-wider uppercase shadow-lg">
+                INITIALIZE
+            </button>
+        </div>
+
+        <!-- Game Over Screen Overlay -->
+        <div id="gameover-screen" class="absolute inset-0 bg-[#080812]/95 backdrop-blur-md flex flex-col items-center justify-center z-30 p-6 text-center hidden">
+            <h2 class="text-4xl font-black text-[#ff007f] glow-pink mb-1">SYSTEM CRASH</h2>
+            <p class="text-xs text-gray-400 mb-6 tracking-widest">HULL INTEGRITY COMPROMISED</p>
+            
+            <div class="bg-gray-900/80 border border-[#ff007f]/30 p-6 rounded-2xl mb-8 w-full max-w-xs space-y-4 glow-box-pink">
+                <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+                    <span class="text-sm text-gray-400">FINAL SCORE</span>
+                    <span id="final-score" class="text-xl font-bold glow-text">000000</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-400">HIGH SCORE</span>
+                    <span id="final-highscore" class="text-xl font-bold text-[#ff007f] glow-pink">000000</span>
+                </div>
+            </div>
+
+            <button id="restart-btn" class="cyber-button text-black font-black px-8 py-4 rounded-xl text-lg tracking-wider uppercase shadow-lg">
+                REBOOT SYSTEM
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Instructions / Footer info -->
+    <div class="mt-4 text-center text-xs text-gray-500 tracking-wider">
+        DESKTOP & MOBILE COMPATIBLE • BUILT WITH HTML5 CANVAS & TAILWIND
+    </div>
+
+    <script>
+        // Game setup & Canvas initialization
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('gameover-screen');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const scoreDisplay = document.getElementById('score-display');
+        const highscoreDisplay = document.getElementById('highscore-display');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const finalHighscoreDisplay = document.getElementById('final-highscore');
+
+        let gameState = 'START'; // START, PLAYING, GAMEOVER
+        let score = 0;
+        let highscore = localStorage.getItem('cyber_runner_highscore') || 0;
+        highscoreDisplay.innerText = String(highscore).padStart(6, '0');
+
+        let animationFrameId;
+        let lastTime = 0;
+        let difficultyMultiplier = 1;
+
+        // Player ship object
+        let player = {
+            x: 0,
+            y: 0,
+            radius: 16,
+            targetX: 0,
+            targetY: 0,
+            speed: 7,
+            color: '#00f0ff',
+            trail: []
+        };
+
+        // Keyboard state tracking
+        let keys = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            ArrowUp: false,
+            ArrowDown: false,
+            KeyA: false,
+            KeyD: false,
+            KeyW: false,
+            KeyS: false
+        };
+
+        // Entities arrays
+        let obstacles = [];
+        let particles = [];
+        let collectibles = [];
+        let gridLines = [];
+
+        // Resize canvas to match display size cleanly
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            if (gameState === 'START') {
+                player.x = canvas.width / 2;
+                player.y = canvas.height - 80;
+                player.targetX = player.x;
+                player.targetY = player.y;
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Input Handling: Mouse & Touch
+        let isPointerDown = false;
+
+        function updatePointerPosition(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            player.targetX = clientX - rect.left;
+            player.targetY = clientY - rect.top;
+            
+            // Constrain inside bounds
+            player.targetX = Math.max(player.radius, Math.min(canvas.width - player.radius, player.targetX));
+            player.targetY = Math.max(player.radius, Math.min(canvas.height - player.radius, player.targetY));
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            isPointerDown = true;
+            updatePointerPosition(e.clientX, e.clientY);
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (isPointerDown && gameState === 'PLAYING') {
+                updatePointerPosition(e.clientX, e.clientY);
+            }
+        });
+
+        window.addEventListener('pointerup', () => {
+            isPointerDown = false;
+        });
+
+        // Input Handling: Keyboard Listeners
+        window.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.code)) {
+                keys[e.code] = true;
+                if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) {
+                    e.preventDefault(); // Prevent page scrolling
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.code)) {
+                keys[e.code] = false;
+            }
+        });
+
+        // Initialize background moving grid
+        for (let i = 0; i < 15; i++) {
+            gridLines.push({
+                y: Math.random() * canvas.height,
+                speed: 3
+            });
+        }
+
+        // Start Game
+        function startGame() {
+            score = 0;
+            difficultyMultiplier = 1;
+            obstacles = [];
+            collectibles = [];
+            particles = [];
+            player.x = canvas.width / 2;
+            player.y = canvas.height - 100;
+            player.targetX = player.x;
+            player.targetY = player.y;
+            player.trail = [];
+
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            gameState = 'PLAYING';
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+
+        // Spawn Mechanics
+        let obstacleTimer = 0;
+        let collectibleTimer = 0;
+
+        function spawnEntities(delta) {
+            obstacleTimer += delta;
+            collectibleTimer += delta;
+
+            let spawnInterval = Math.max(400, 1200 - (score * 0.05));
+            if (obstacleTimer > spawnInterval) {
+                obstacleTimer = 0;
+                let size = Math.random() * 25 + 20;
+                obstacles.push({
+                    x: Math.random() * (canvas.width - size * 2) + size,
+                    y: -size,
+                    size: size,
+                    speed: (Math.random() * 2 + 3) * difficultyMultiplier,
+                    rotation: 0,
+                    rotSpeed: (Math.random() - 0.5) * 0.05
+                });
+            }
+
+            if (collectibleTimer > 2500) {
+                collectibleTimer = 0;
+                collectibles.push({
+                    x: Math.random() * (canvas.width - 40) + 20,
+                    y: -20,
+                    radius: 12,
+                    speed: 2.5 * difficultyMultiplier
+                });
+            }
+        }
+
+        // Particle system generator
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 35; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 6 + 2;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: Math.random() * 3 + 1,
+                    color: color,
+                    alpha: 1,
+                    decay: Math.random() * 0.03 + 0.015
+                });
+            }
+        }
+
+        function createSparkles(x, y) {
+            for (let i = 0; i < 8; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 3,
+                    vy: (Math.random() - 0.5) * 3,
+                    radius: Math.random() * 2 + 1,
+                    color: '#00f0ff',
+                    alpha: 1,
+                    decay: 0.05
+                });
+            }
+        }
+
+        // Main Update Loop
+        function update(delta) {
+            if (gameState !== 'PLAYING') return;
+
+            score += Math.round(delta * 0.02);
+            difficultyMultiplier = 1 + (score / 3000);
+            scoreDisplay.innerText = String(score).padStart(6, '0');
+
+            // Keyboard movement handling
+            if (!isPointerDown) {
+                let dx = 0;
+                let dy = 0;
+                if (keys.ArrowLeft || keys.KeyA) dx -= 1;
+                if (keys.ArrowRight || keys.KeyD) dx += 1;
+                if (keys.ArrowUp || keys.KeyW) dy -= 1;
+                if (keys.ArrowDown || keys.KeyS) dy += 1;
+
+                if (dx !== 0 || dy !== 0) {
+                    player.targetX += dx * player.speed;
+                    player.targetY += dy * player.speed;
+                    player.targetX = Math.max(player.radius, Math.min(canvas.width - player.radius, player.targetX));
+                    player.targetY = Math.max(player.radius, Math.min(canvas.height - player.radius, player.targetY));
+                }
+            }
+
+            // Smooth interpolation for player movement (Lerp)
+            player.x += (player.targetX - player.x) * 0.2;
+            player.y += (player.targetY - player.y) * 0.2;
+
+            player.trail.push({ x: player.x, y: player.y });
+            if (player.trail.length > 12) {
+                player.trail.shift();
+            }
+
+            gridLines.forEach(line => {
+                line.y += 4 * difficultyMultiplier;
+                if (line.y > canvas.height) line.y = 0;
+            });
+
+            spawnEntities(delta);
+
+            // Update obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.y += obs.speed;
+                obs.rotation += obs.rotSpeed;
+
+                let distX = Math.abs(player.x - obs.x);
+                let distY = Math.abs(player.y - obs.y);
+
+                if (distX < obs.size / 2 + player.radius * 0.7 && distY < obs.size / 2 + player.radius * 0.7) {
+                    createExplosion(player.x, player.y, '#ff007f');
+                    triggerGameOver();
+                }
+
+                if (obs.y > canvas.height + obs.size) {
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // Update collectibles
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                let col = collectibles[i];
+                col.y += col.speed;
+
+                let dx = player.x - col.x;
+                let dy = player.y - col.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < player.radius + col.radius) {
+                    score += 250;
+                    createSparkles(col.x, col.y);
+                    collectibles.splice(i, 1);
+                } else if (col.y > canvas.height + col.radius) {
+                    collectibles.splice(i, 1);
+                }
+            }
+
+            // Update particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= p.decay;
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // Render Loop
+        function render() {
+            ctx.fillStyle = '#080812';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.08)';
+            ctx.lineWidth = 1;
+            gridLines.forEach(line => {
+                ctx.beginPath();
+                ctx.moveTo(0, line.y);
+                ctx.lineTo(canvas.width, line.y);
+                ctx.stroke();
+            });
+
+            collectibles.forEach(col => {
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#00f0ff';
+                ctx.fillStyle = '#00f0ff';
+                ctx.beginPath();
+                ctx.arc(col.x, col.y, col.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(col.x, col.y, col.radius * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            obstacles.forEach(obs => {
+                ctx.save();
+                ctx.translate(obs.x, obs.y);
+                ctx.rotate(obs.rotation);
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ff007f';
+                ctx.strokeStyle = '#ff007f';
+                ctx.lineWidth = 3;
+                ctx.fillStyle = 'rgba(255, 0, 127, 0.15)';
+                ctx.strokeRect(-obs.size / 2, -obs.size / 2, obs.size, obs.size);
+                ctx.fillRect(-obs.size / 2, -obs.size / 2, obs.size, obs.size);
+                ctx.restore();
+            });
+
+            for (let i = 0; i < player.trail.length; i++) {
+                let t = player.trail[i];
+                let ratio = i / player.trail.length;
+                ctx.fillStyle = `rgba(0, 240, 255, ${ratio * 0.3})`;
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, player.radius * ratio * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (gameState === 'PLAYING') {
+                ctx.save();
+                ctx.translate(player.x, player.y);
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#00f0ff';
+                
+                ctx.strokeStyle = '#00f0ff';
+                ctx.lineWidth = 3;
+                ctx.fillStyle = '#080812';
+                ctx.beginPath();
+                ctx.moveTo(0, -player.radius * 1.2);
+                ctx.lineTo(player.radius, player.radius);
+                ctx.lineTo(0, player.radius * 0.5);
+                ctx.lineTo(-player.radius, player.radius);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#ff007f';
+                ctx.beginPath();
+                ctx.arc(0, player.radius * 0.6, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = p.color;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        function triggerGameOver() {
+            gameState = 'GAMEOVER';
+            if (score > highscore) {
+                highscore = score;
+                localStorage.setItem('cyber_runner_highscore', highscore);
+            }
+            highscoreDisplay.innerText = String(highscore).padStart(6, '0');
+            finalScoreDisplay.innerText = String(score).padStart(6, '0');
+            finalHighscoreDisplay.innerText = String(highscore).padStart(6, '0');
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        function gameLoop(timestamp) {
+            let delta = timestamp - lastTime;
+            lastTime = timestamp;
+
+            if (isNaN(delta) || delta > 100) delta = 16.6;
+
+            update(delta);
+            render();
+
+            if (gameState === 'PLAYING') {
+                animationFrameId = requestAnimationFrame(gameLoop);
+            }
+        }
+    </script>
+</body>
+</html>
